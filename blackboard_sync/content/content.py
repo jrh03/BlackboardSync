@@ -29,6 +29,7 @@ class Content:
         self.handler = None
 
         self.ignore = not Content.should_download(content, job)
+        self.is_ultra_document_body = content.title == "ultraDocumentBody"
 
         if self.ignore:
             return
@@ -50,22 +51,23 @@ class Content:
                 BBBadRequestError, BBForbiddenError, RequestException):
             logger.warning(f"Error fetching body of {content.title}")
 
+
     def write(self, path: Path, executor: ThreadPoolExecutor):
-        if self.ignore:
-            return
+            if self.ignore and not self.is_ultra_document_body:
+                return
 
-        # Build nested path with content title
-        path = path / self.title
+            # Build nested path with content title
+            path = path / self.title if not self.is_ultra_document_body else path
 
-        if self.handler is not None:
-            if self.handler.create_dir:
+            if self.handler is not None:
+                if self.handler.create_dir:
+                    path.mkdir(exist_ok=True, parents=True)
+
+                self.handler.write(path, executor)
+
+            if self.body is not None:
                 path.mkdir(exist_ok=True, parents=True)
-
-            self.handler.write(path, executor)
-
-        if self.body is not None:
-            path.mkdir(exist_ok=True, parents=True)
-            self.body.write(path, executor)
+                self.body.write(path, executor)
 
     @staticmethod
     def should_download(content: BBCourseContent, job: DownloadJob):
